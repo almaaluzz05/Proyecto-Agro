@@ -1,190 +1,89 @@
-# Proyecto-Agro [index.html](https://github.com/user-attachments/files/26578003/index.html)
-<!doctype html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SmartPlant 🌱</title>
+[README.md](https://github.com/user-attachments/files/27971325/README.md)
+**RootUp**
 
-<script src="https://cdn.tailwindcss.com"></script>
+Materia: Laboratorio de Programación  
+Escuela: EEST N.º 1 "Eduardo Ader" — Vicente López  
+Curso: 5°3° A-B  
+Año: 2026
 
-<style>
-body { background:#1a2e1a; color:#a8e6a0; font-family:Arial; text-align:center; }
-.card { background:#223b22; margin:10px; padding:15px; border-radius:10px; }
-button { background:#4caf50; color:white; padding:10px; border-radius:5px; border:none; margin:5px; }
-input { margin:5px; padding:8px; border-radius:5px; width:90%; }
-</style>
-</head>
+-------------------------------------------------------------
 
-<body>
+Integrantes del grupo
 
-<!-- LOGIN -->
-<div id="login">
-  <h1>🌱 SmartPlant</h1>
-  <h2>Iniciar sesión</h2>
+- Mikaela Batirola
+- Lucas Benítez
+- Alma Lazarte
+- Alma Olívola
 
-  <input id="user" placeholder="Usuario"><br>
-  <input id="pass" type="password" placeholder="Contraseña"><br>
+-------------------------------------------------------------
 
-  <button onclick="login()">Ingresar</button>
-  <button onclick="register()">Registrarse</button>
+Descripción del proyecto
 
-  <p id="msg"></p>
-</div>
+RootUp es una aplicación web orientada al sector agropecuario y doméstico que permite a los usuarios:
 
-<!-- APP -->
-<div id="app" style="display:none">
+- Consultar una base de datos de plantas con información de riego, luz y épocas de siembra adaptadas al hemisferio sur.
+- Guardar sus plantas personales y recibir alertas de riego
+- Marcar plantas favoritas para acceso rápido
+- Registrar el historial de riego de cada planta
 
-  <h1>🌱 SmartPlant</h1>
-  <p id="welcome"></p>
+La idea del proyecto surgió inicialmente como una propuesta relacionada con inteligencia artificial y reconocimiento de plantas mediante imágenes. Pero, después de investigar la complejidad de ese sistema y analizar nuestras posibilidades, decidimos transformar la idea en una plataforma más accesible y realista para nuestro nivel actual de programación.
 
-  <button onclick="logout()">Cerrar sesión</button>
+A partir de eso creamos RootUp, una aplicación inspirada en la idea de un “Google de plantas”, donde los usuarios pueden buscar especies, explorar categorías, acceder a información detallada y registrar cuidados básicos como los riegos.
 
-  <hr>
+Este proyecto forma parte del Proyecto Integrador Anual, que también incluye SmartPlant: un sistema físico de autorriego automático con sensor de humedad y Arduino.
 
-  <form onsubmit="addPlant(event)">
-    <input id="name" placeholder="Nombre planta" required><br>
-    <input id="date" type="date" required><br>
-    <input id="location" placeholder="Ubicación"><br>
-    <button type="submit">Agregar</button>
-  </form>
+-------------------------------------------------------------
 
-  <div id="list"></div>
+Estructura de carpetas
 
-</div>
+RootUp/
+├── src/                  ← Código de la app
+│   ├── index.html        ← Estructura principal (pantallas y modales)
+│   ├── style.css         ← Estilos visuales de toda la app
+│   ├── app.js            ← Lógica: navegación, filtros, riego, favoritas
+│   └── datos.js          ← Base de datos de plantas
+│
+├── docs/                 ← Documentación del proyecto
+│   ├── wireframes/       ← Bocetos de las pantallas
+│   └── informe.pdf       ← Informe APA v7
+│
+├── img/                  ← Imágenes del proyecto
+│
+└── README.md             ← Este archivo
 
-<script>
+-------------------------------------------------------------
 
-// USUARIO ACTUAL
-let currentUser = localStorage.getItem("currentUser");
+Pantallas de la app
 
-// MOSTRAR APP SI YA ESTÁ LOGUEADO
-if (currentUser) {
-  showApp();
-}
+Inicio | Saludo, estadísticas rápidas y plantas destacadas
+Buscar| Búsqueda por nombre y por categoría
+Favoritas | Lista de plantas marcadas como favoritas
+Mis plantas | Plantas propias del usuario
+Alertas | Recordatorios de riego con barra de urgencia
 
-// REGISTRARSE
-function register() {
-  const user = document.getElementById("user").value;
-  const pass = document.getElementById("pass").value;
+-------------------------------------------------------------
 
-  if (!user || !pass) return alert("Completá todo");
+Links del proyecto
 
-  let users = JSON.parse(localStorage.getItem("users")) || {};
+App en producción: [rootup.base44.app](https://rootup.base44.app)
+Repositorio GitHub: (https://github.com/almaaluzz05/Proyecto-Agro)
 
-  if (users[user]) {
-    document.getElementById("msg").innerText = "Usuario ya existe";
-    return;
-  }
+-------------------------------------------------------------
 
-  users[user] = pass;
-  localStorage.setItem("users", JSON.stringify(users));
+Estado del proyecto
 
-  document.getElementById("msg").innerText = "Registrado con éxito";
-}
+Primer cuatrimestre — Mayo 2026
 
-// LOGIN
-function login() {
-  const user = document.getElementById("user").value;
-  const pass = document.getElementById("pass").value;
+[x] Base de datos de plantas
+[x] Búsqueda y filtros por categoría
+[x] Sistema de favoritas
+[x] Seguimiento de plantas propias
+[x] Alertas de riego con historial
+[ ] Login con cuenta propia (segundo cuatrimestre)
+[ ] Conexión con SmartPlant (segundo cuatrimestre)
+[ ] Base de datos en la nube (segundo cuatrimestre)
+[ ] App publicada (segundo cuatrimestre)
 
-  let users = JSON.parse(localStorage.getItem("users")) || {};
+-------------------------------------------------------------
 
-  if (users[user] === pass) {
-    localStorage.setItem("currentUser", user);
-    currentUser = user;
-    showApp();
-  } else {
-    document.getElementById("msg").innerText = "Datos incorrectos";
-  }
-}
-
-// MOSTRAR APP
-function showApp() {
-  document.getElementById("login").style.display = "none";
-  document.getElementById("app").style.display = "block";
-  document.getElementById("welcome").innerText = "Hola " + currentUser;
-
-  loadPlants();
-}
-
-// LOGOUT
-function logout() {
-  localStorage.removeItem("currentUser");
-  location.reload();
-}
-
-// PLANTAS
-let plants = [];
-
-// CARGAR
-function loadPlants() {
-  plants = JSON.parse(localStorage.getItem("plants_" + currentUser)) || [];
-  render();
-}
-
-// GUARDAR
-function save() {
-  localStorage.setItem("plants_" + currentUser, JSON.stringify(plants));
-}
-
-// AGREGAR
-function addPlant(e) {
-  e.preventDefault();
-
-  const plant = {
-    id: Date.now(),
-    name: document.getElementById("name").value,
-    date: document.getElementById("date").value,
-    location: document.getElementById("location").value,
-    watered: false
-  };
-
-  plants.push(plant);
-  save();
-  render();
-
-  e.target.reset();
-}
-
-// MOSTRAR
-function render() {
-  const list = document.getElementById("list");
-  list.innerHTML = "";
-
-  plants.forEach(p => {
-    list.innerHTML += `
-      <div class="card">
-        <h3>${p.name}</h3>
-        <p>📅 ${p.date}</p>
-        <p>📍 ${p.location}</p>
-        <p>${p.watered ? "💧 Regada" : "🏜️ Sin regar"}</p>
-
-        <button onclick="toggle(${p.id})">Regar</button>
-        <button onclick="deletePlant(${p.id})">Eliminar</button>
-      </div>
-    `;
-  });
-}
-
-// REGAR
-function toggle(id) {
-  plants = plants.map(p => {
-    if (p.id === id) p.watered = !p.watered;
-    return p;
-  });
-  save();
-  render();
-}
-
-// ELIMINAR
-function deletePlant(id) {
-  plants = plants.filter(p => p.id !== id);
-  save();
-  render();
-}
-
-</script>
-
-</body>
-</html>
+Proyecto Integrador Anual — LPR 5° 3° A-B — 2026
