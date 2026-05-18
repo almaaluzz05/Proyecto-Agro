@@ -3,9 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AgroPlant</title>
+  <title>RootUp</title>
   <link rel="stylesheet" href="style.css" />
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;1,500&family=Outfit:wght@300;400;500&display=swap" rel="stylesheet" />
+  <link rel="icon" type="image" href="rootup.jpg">
 </head>
 <body>
 
@@ -26,7 +27,7 @@
       <span>Favoritas</span>
     </button>
     <button class="nav-btn" onclick="irA('mis-plantas')" id="nav-mis-plantas">
-      <svg viewBox="0 0 24 24"><path d="M12 22V12"/><path d="M12 12C12 12 7 9 7 5a5 5 0 0 1 10 0c0 4-5 7-5 7z"/><path d="M12 12c0 0-5 3-5 7"/><path d="M12 12c0 0 5 3 5 7"/></svg>
+      <svg viewBox="0 0 24 24"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg>
       <span>Mis plantas</span>
     </button>
     <button class="nav-btn" onclick="irA('recordatorios')" id="nav-recordatorios">
@@ -38,13 +39,14 @@
   <!-- ═══════════════════════════════
        PANTALLA: INICIO
   ═══════════════════════════════ -->
+</div>
   <div id="pantalla-inicio" class="pantalla activa">
     <div class="inicio-hero">
       <div class="hero-deco"></div>
       <div class="hero-content">
         <p class="hero-saludo" id="saludo-hora">Buenos días</p>
-        <h1 class="hero-titulo">AgroPlant</h1>
-        <p class="hero-sub">Tu compañero de las plantas</p>
+        <h1 class="hero-titulo">RootUp</h1>
+        <p class="hero-sub">Tu guía inteligente de plantas</p>
       </div>
     </div>
 
@@ -82,10 +84,10 @@
         <button class="filtro-btn activo" onclick="filtrarCategoria('todas', this)">Todas</button>
         <button class="filtro-btn" onclick="filtrarCategoria('interior', this)">Interior</button>
         <button class="filtro-btn" onclick="filtrarCategoria('huerta', this)">Huerta</button>
-        <button class="filtro-btn" onclick="filtrarCategoria('suculenta', this)">Suculentas</button>
+        <button class="filtro-btn" onclick="filtrarCategoria('suculentas', this)">Suculentas</button>
         <button class="filtro-btn" onclick="filtrarCategoria('flores', this)">Flores</button>
-        <button class="filtro-btn" onclick="filtrarCategoria('cactus', this)">Cactus</button>
         <button class="filtro-btn" onclick="filtrarCategoria('árboles', this)">Árboles</button>
+        <button class="filtro-btn" onclick="filtrarCategoria('cactus', this)">Cactus</button>
         <button class="filtro-btn" onclick="filtrarCategoria('Aromáticas', this)">Aromáticas</button>
       </div>
 
@@ -166,13 +168,13 @@
       <label class="form-label">¿Qué planta es?</label>
       <select id="select-planta" class="form-select"></select>
 
-      <label class="form-label">Nombre personalizado</label>
+      <label class="form-label">Nombre personalizado (opcional)</label>
       <input type="text" id="input-nombre-planta" class="form-input" placeholder="Ej: El potus de la cocina..." maxlength="40" />
 
       <label class="form-label">Fecha del último riego</label>
       <input type="date" id="input-ultimo-riego" class="form-input" />
 
-      <label class="form-label">Notas</label>
+      <label class="form-label">Notas (opcional)</label>
       <textarea id="input-notas" class="form-textarea" placeholder="Observaciones, estado, dónde está ubicada..." rows="3"></textarea>
 
       <button class="btn-accion full" onclick="guardarMiPlanta()">Guardar planta</button>
