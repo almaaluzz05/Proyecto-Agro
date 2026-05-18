@@ -1,11 +1,6 @@
-// ══════════════════════════════════════════════════════
-//  app.js — Lógica principal de PlantaGuía
-// ══════════════════════════════════════════════════════
-
 // ─── Estado global de la app ───────────────────────
 let categoriaActual  = 'todas';   // Filtro activo en búsqueda
 let plantaRiegoId    = null;      // ID de planta al registrar riego
-
 // ─── Cargar datos del localStorage ─────────────────
 function cargarFavoritas()   { return JSON.parse(localStorage.getItem('pg-favoritas')   || '[]'); }
 function cargarMisPlantas()  { return JSON.parse(localStorage.getItem('pg-mis-plantas') || '[]'); }
@@ -301,7 +296,7 @@ function renderRecordatorios() {
     const dias     = diasHastaRiego(p);
     const ciclo    = planta.diasRiego;
 
-    // Calcular porcentaje de la barra (cuán urgente es)
+    // Calcular porcentaje de la barra
     const porcentaje = Math.max(0, Math.min(100, ((ciclo - dias) / ciclo) * 100));
     const claseUrgencia = dias < 0 ? 'urgente' : dias <= 2 ? 'pronto' : '';
 
@@ -455,9 +450,6 @@ function agregarDesdeDetalle(plantaId) {
   }, 100);
 }
 
-// ══════════════════════════════════════════════════════
-//  HELPERS (funciones de ayuda)
-// ══════════════════════════════════════════════════════
 
 /**
  * Genera el HTML de una card de planta
@@ -507,7 +499,7 @@ function diasHastaRiego(miPlanta) {
 }
 
 /**
- * Devuelve la fecha de hoy en formato YYYY-MM-DD para inputs tipo date
+ * Devuelve la fecha de hoy
  */
 function hoy() {
   return new Date().toISOString().split('T')[0];
@@ -519,9 +511,7 @@ function hoy() {
 function cerrarModal(id) {
   document.getElementById(id).classList.add('hidden');
 }
-
 // ══════════════════════════════════════════════════════
 //  INICIO DE LA APP
 // ══════════════════════════════════════════════════════
-
 irA('inicio');
