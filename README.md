@@ -35,7 +35,7 @@ Este proyecto forma parte del Proyecto Integrador Anual, que también incluye Sm
 -------------------------------------------------------------
 
 Estructura de carpetas
-
+<pre>
 RootUp/
 ├── src/                  ← Código de la app
 │   ├── index.html        ← Estructura principal (pantallas y modales)
@@ -50,17 +50,17 @@ RootUp/
 ├── img/                  ← Imágenes del proyecto
 │
 └── README.md             ← Este archivo
-
+</pre>
 -------------------------------------------------------------
 
 Pantallas de la app
-
+<pre>
 Inicio | Saludo, estadísticas rápidas y plantas destacadas
 Buscar| Búsqueda por nombre y por categoría
 Favoritas | Lista de plantas marcadas como favoritas
 Mis plantas | Plantas propias del usuario
 Alertas | Recordatorios de riego con barra de urgencia
-
+</pre>
 -------------------------------------------------------------
 
 Links del proyecto
@@ -73,7 +73,7 @@ Repositorio GitHub: (https://github.com/almaaluzz05/Proyecto-Agro)
 Estado del proyecto
 
 Primer cuatrimestre — Mayo 2026
-
+<pre>
 [x] Base de datos de plantas
 [x] Búsqueda y filtros por categoría
 [x] Sistema de favoritas
@@ -83,7 +83,7 @@ Primer cuatrimestre — Mayo 2026
 [ ] Conexión con SmartPlant (segundo cuatrimestre)
 [ ] Base de datos en la nube (segundo cuatrimestre)
 [ ] App publicada (segundo cuatrimestre)
-
+</pre>
 -------------------------------------------------------------
 
 Proyecto Integrador Anual — LPR 5° 3° A-B — 2026
