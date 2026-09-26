@@ -1,49 +1,630 @@
-// ─── Estado global de la app ───────────────────────
-let categoriaActual  = 'todas';   // Filtro activo en búsqueda
-let plantaRiegoId    = null;      // ID de planta al registrar riego
-// ─── Cargar datos del localStorage ─────────────────
-function cargarFavoritas()   { return JSON.parse(localStorage.getItem('pg-favoritas')   || '[]'); }
-function cargarMisPlantas()  { return JSON.parse(localStorage.getItem('pg-mis-plantas') || '[]'); }
-function guardarFavoritas(f) { localStorage.setItem('pg-favoritas',   JSON.stringify(f)); }
-function guardarMisPlantas(p){ localStorage.setItem('pg-mis-plantas', JSON.stringify(p)); }
+// ══════════════════════════════════════════════════════
+//  app.js — Lógica principal de RootUp
+//  Laboratorio de Programación 2026
+// ══════════════════════════════════════════════════════
+
+// ─── Variables globales ───────────────────────────────
+let categoriaActual = 'todas'; // Filtro activo en búsqueda
+let plantaRiegoId   = null;    // ID de planta al registrar riego
+let usuarioActual   = null;    // Datos del usuario logueado
+let hemisferio      = null;    // 'sur' o 'norte'
+let favoritosCache  = [];      // IDs de favoritos cargados desde MySQL
+let misPlantasCache = [];      // Plantas propias cargadas desde MySQL
+let PLANTAS = [];  // Se carga desde MySQL en vez de datos.js
+
+// ─── URL base de los archivos PHP ────────────────────
+const API = './api';
+
+// ══════════════════════════════════════════════════════
+//  USUARIO (localStorage — solo para mantener sesión)
+// ══════════════════════════════════════════════════════
+
+function guardarUsuario(u) { localStorage.setItem('ru-usuario', JSON.stringify(u)); }
+function cargarUsuario()   { return JSON.parse(localStorage.getItem('ru-usuario') || 'null'); }
+
+// ══════════════════════════════════════════════════════
+//  HEMISFERIO (localStorage)
+// ══════════════════════════════════════════════════════
+
+async function elegirHemisferio(opcion) {
+  console.log(usuarioActual);
+  console.log(opcion);
+
+  hemisferio = opcion;
+  localStorage.setItem('ru-hemisferio', opcion);
+
+  try {
+    const respuesta = await fetch(`${API}/actualizar_hemisferio.php`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        usuario_id: usuarioActual.id,
+        hemisferio: opcion
+      })
+    });
+
+    const datos = await respuesta.json();
+    console.log(datos);
+
+  } catch (error) {
+    console.error(error);
+  }
+
+  cerrarModal('modal-hemisferio');
+   irA('inicio');
+}
+
+function cargarHemisferio() {
+  hemisferio = localStorage.getItem('ru-hemisferio') || 'sur';
+}
+
+// ══════════════════════════════════════════════════════
+//  TEMA (claro / oscuro)
+// ══════════════════════════════════════════════════════
+
+function aplicarTema(tema) {
+  document.documentElement.setAttribute('data-tema', tema);
+  localStorage.setItem('ru-tema', tema);
+}
+
+function cargarTema() {
+  aplicarTema(localStorage.getItem('ru-tema') || 'claro');
+}
+
+// Se llama desde los botones de la pantalla de perfil
+function cambiarTema(opcion) {
+  aplicarTema(opcion);
+  document.getElementById('perfil-btn-claro').classList.toggle('activo', opcion === 'claro');
+  document.getElementById('perfil-btn-oscuro').classList.toggle('activo', opcion === 'oscuro');
+}
+
+async function cargarPlantas() {
+  try {
+    const r = await fetch(`${API}/plantas.php`);
+    const d = await r.json();
+    if (d.exito && Array.isArray(d.plantas)) {
+      // Adaptar los nombres de campos de MySQL al formato que usa la app
+      PLANTAS = d.plantas.map(p => ({
+        id:                p.id,
+        nombre:            p.nombre,
+        cientifico:        p.cientifico,
+        emoji:             p.emoji,
+        categoria:         p.categoria ? p.categoria.split(',').map(t => t.trim()) : [],
+        diasRiego:         p.dias_riego,
+        luz:               p.luz,
+        mesesSiembra:      p.meses_siembra_sur,
+        mesesSiembraNorte: p.meses_siembra_norte,
+        dificultad:        p.dificultad,
+        descripcion:       p.descripcion,
+        cuidados:          p.cuidados,
+        curiosidad:        p.curiosidad,
+        imagen:            p.imagen,
+        tags:              p.tags ? p.tags.split(',').map(t => t.trim()) : [],
+        advertencia:       p.advertencia || null,
+      }));
+    }
+  } catch (e) {
+    console.error('Error cargando plantas:', e);
+  }
+}
+// ══════════════════════════════════════════════════════
+//  FAVORITOS (MySQL)
+// ══════════════════════════════════════════════════════
+
+// Trae los favoritos del usuario desde MySQL
+async function cargarFavoritas() {
+  if (!usuarioActual) return;
+  try {
+    const r = await fetch(`${API}/favoritos.php?usuario_id=${usuarioActual.id}`);
+    const d = await r.json();
+    if (d.exito && Array.isArray(d.favoritos)) {
+      favoritosCache = d.favoritos;
+    } else {
+      favoritosCache = [];
+    }
+  } catch (e) {
+    console.error('Error cargando favoritos:', e);
+    favoritosCache = [];
+  }
+}
+
+// Agrega o quita un favorito en MySQL
+async function toggleFavorita(id, evento) {
+  evento.stopPropagation();
+  if (!usuarioActual) return;
+  try {
+    const r = await fetch(`${API}/favoritos.php`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ usuario_id: usuarioActual.id, planta_id: id })
+    });
+    const d = await r.json();
+    if (d.exito) {
+      // Actualizar la caché
+      if (d.accion === 'agregado') favoritosCache.push(id);
+      else favoritosCache = favoritosCache.filter(x => x !== id);
+
+      // Actualizar el ícono del corazón en la card
+      const btn = document.querySelector(`.card-fav-btn[data-id="${id}"]`);
+      if (btn) btn.textContent = favoritosCache.includes(id) ? '❤️' : '🤍';
+
+      // Si estamos en favoritas, refrescar la lista
+      if (document.getElementById('pantalla-favoritas').classList.contains('activa')) {
+        renderFavoritas();
+      }
+    }
+  } catch (e) {
+    console.error('Error actualizando favorito:', e);
+  }
+}
+
+// Agrega o quita favorito desde el modal de detalle
+async function toggleFavoritaDesdeDetalle(id) {
+  if (!usuarioActual) return;
+  await toggleFavorita(id, { stopPropagation: () => {} });
+  const btn = document.getElementById('btn-fav-detalle');
+  if (btn) btn.textContent = favoritosCache.includes(id) ? '❤️ En favoritas' : '🤍 Agregar favorita';
+}
+
+// ══════════════════════════════════════════════════════
+//  MIS PLANTAS (MySQL)
+// ══════════════════════════════════════════════════════
+
+// Trae las plantas propias del usuario desde MySQL
+async function cargarMisPlantas() {
+  if (!usuarioActual) return;
+  try {
+    const r = await fetch(`${API}/mis_plantas.php?usuario_id=${usuarioActual.id}`);
+    const d = await r.json();
+    if (d.exito) misPlantasCache = d.plantas;
+  } catch (e) {
+    console.error('Error cargando mis plantas:', e);
+  }
+}
 
 // ══════════════════════════════════════════════════════
 //  NAVEGACIÓN
 // ══════════════════════════════════════════════════════
 
-function irA(id) {
-  // Ocultar todas las pantallas
+async function irA(id) {
+  // Ocultar todas las pantallas y desmarcar botones
   document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
 
-  // Mostrar la pantalla y activar el botón correspondiente
+  // Mostrar la pantalla correcta
   document.getElementById('pantalla-' + id).classList.add('activa');
-  document.getElementById('nav-' + id).classList.add('active');
 
-  // Acciones específicas por pantalla
-  if (id === 'inicio')        renderInicio();
+  // Activar el botón correspondiente si existe
+  const btnNav = document.getElementById('nav-' + id);
+  if (btnNav) btnNav.classList.add('active');
+
+  // Ocultar navbar en login y registro
+  const navbar = document.getElementById('navbar');
+  if (id === 'login' || id === 'registro') {
+    navbar.classList.add('hidden');
+  } else {
+    navbar.classList.remove('hidden');
+  }
+
+  // Cargar contenido de cada pantalla
+  if (id === 'inicio')        await renderInicio();
   if (id === 'buscar')        renderBuscar();
   if (id === 'favoritas')     renderFavoritas();
-  if (id === 'mis-plantas')   renderMisPlantas();
-  if (id === 'recordatorios') renderRecordatorios();
+  if (id === 'mis-plantas')   await renderMisPlantas();
+  if (id === 'recordatorios') await renderRecordatorios();
+  if (id === 'perfil')        await renderPerfil();
 
   window.scrollTo(0, 0);
+}
+
+// ══════════════════════════════════════════════════════
+//  LOGIN
+// ══════════════════════════════════════════════════════
+
+async function iniciarSesion() {
+  const email    = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errorDiv = document.getElementById('login-error');
+
+  if (!email || !password) {
+    errorDiv.textContent = 'Completá todos los campos';
+    return;
+  }
+
+  errorDiv.textContent = 'Iniciando sesión...';
+
+  try {
+    const respuesta = await fetch(`${API}/login.php`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ email, password })
+    });
+
+    const datos = await respuesta.json();
+
+    if (datos.exito) {
+      usuarioActual = datos.usuario;
+      guardarUsuario(datos.usuario);
+      actualizarUIAdmin();
+      actualizarUIPerfil();
+      errorDiv.textContent = '';
+
+      // Cargar datos desde MySQL antes de mostrar la app
+      await cargarFavoritas();
+      await cargarMisPlantas();
+
+      irA('inicio');
+    } else {
+      errorDiv.textContent = datos.mensaje;
+    }
+
+  } catch (error) {
+    errorDiv.textContent = 'Error de conexión con el servidor';
+  }
+}
+
+// ══════════════════════════════════════════════════════
+//  REGISTRO
+// ══════════════════════════════════════════════════════
+
+async function registrarUsuario() {
+  const nombre   = document.getElementById('registro-nombre').value.trim();
+  const email    = document.getElementById('registro-email').value.trim();
+  const password = document.getElementById('registro-password').value;
+  const errorDiv = document.getElementById('registro-error');
+  const exitoDiv = document.getElementById('registro-exito');
+
+  if (!nombre || !email || !password) {
+  errorDiv.textContent = 'Completá todos los campos';
+  exitoDiv.textContent = '';
+  return;
+}
+
+// Validar formato de email
+const formatoEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+if (!formatoEmail.test(email)) {
+  errorDiv.textContent = 'Ingresá un email válido (ej: nombre@gmail.com)';
+  exitoDiv.textContent = '';
+  return;
+}
+
+  if (password.length < 6) {
+    errorDiv.textContent = 'La contraseña debe tener al menos 6 caracteres';
+    return;
+  }
+
+  errorDiv.textContent = '';
+  exitoDiv.textContent = 'Creando cuenta...';
+
+  try {
+    const respuesta = await fetch(`${API}/registro.php`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ nombre, email, password })
+    });
+
+    const datos = await respuesta.json();
+
+    if (datos.exito) {
+      exitoDiv.textContent = '¡Cuenta creada! Elegí tu hemisferio.';
+      usuarioActual = datos.usuario;
+      guardarUsuario(datos.usuario);
+      // Enviar email de bienvenida
+      emailjs.send('service_1qqksvq', 'template_qbcqvzk', {
+      nombre:        nombre,
+      email_usuario: email
+}).catch(err => console.error('Error enviando email:', err));
+
+      // Mostrar selector de hemisferio y luego ir al inicio
+      setTimeout(() => {
+  document.getElementById('modal-hemisferio').classList.remove('hidden');
+}, 1000);
+
+    } else {
+      errorDiv.textContent = datos.mensaje;
+      exitoDiv.textContent = '';
+    }
+
+  } catch (error) {
+    errorDiv.textContent = 'Error de conexión con el servidor';
+    exitoDiv.textContent = '';
+  }
+}
+
+async function solicitarRecuperacion() {
+  const email    = document.getElementById('recuperar-email').value.trim();
+  const errorDiv = document.getElementById('recuperar-error');
+  const exitoDiv = document.getElementById('recuperar-exito');
+
+  if (!email) {
+    errorDiv.textContent = 'Ingresá tu email';
+    exitoDiv.textContent = '';
+    return;
+  }
+
+  errorDiv.textContent = '';
+  exitoDiv.textContent = 'Enviando...';
+
+  try {
+    const r = await fetch(`${API}/recuperar_password.php`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ accion: 'solicitar', email })
+    });
+    const d = await r.json();
+
+if (d.exito) {
+  const link = `https://rootup.infinityfreeapp.com/src/reset.html?token=${d.token}`;
+
+  await emailjs.send('service_1qqksvq', 'template_oufb4rx', {
+    nombre:             d.nombre,
+    email_usuario:      d.email,
+    link_recuperacion:  link
+  });
+
+  exitoDiv.textContent = '✅ Te enviamos un email con las instrucciones';
+  errorDiv.textContent = '';
+}
+  } catch (e) {
+    errorDiv.textContent = 'Error de conexión';
+    exitoDiv.textContent = '';
+  }
+}
+// ══════════════════════════════════════════════════════
+//  CERRAR SESIÓN
+// ══════════════════════════════════════════════════════
+
+function cerrarSesion() {
+  usuarioActual   = null;
+  favoritosCache  = [];
+  misPlantasCache = [];
+  localStorage.removeItem('ru-usuario');
+  actualizarUIAdmin();
+  actualizarUIPerfil();
+  irA('login');
+}
+
+function abrirModalEliminarCuenta() {
+  document.getElementById('input-password-eliminar').value = '';
+  document.getElementById('error-eliminar-cuenta').textContent = '';
+  document.getElementById('modal-eliminar-cuenta').classList.remove('hidden');
+}
+
+async function confirmarEliminarCuenta() {
+  const password  = document.getElementById('input-password-eliminar').value;
+  const errorEl   = document.getElementById('error-eliminar-cuenta');
+  errorEl.textContent = '';
+
+  if (!password) {
+    errorEl.textContent = 'Ingresá tu contraseña para confirmar.';
+    return;
+  }
+  if (!usuarioActual) return;
+
+  try {
+    const r = await fetch(`${API}/eliminar_cuenta.php`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({
+        usuario_id: usuarioActual.id,
+        password:   password
+      })
+    });
+    const d = await r.json();
+
+    if (d.exito) {
+      cerrarModal('modal-eliminar-cuenta');
+      alert('Tu cuenta fue eliminada correctamente.');
+      cerrarSesion();
+    } else {
+      errorEl.textContent = d.mensaje || 'No se pudo eliminar la cuenta.';
+    }
+  } catch (e) {
+    console.error('Error eliminando cuenta:', e);
+    errorEl.textContent = 'Error de conexión. Probá de nuevo.';
+  }
+}
+
+// ══════════════════════════════════════════════════════
+//  PANEL ADMIN — agregar plantas al catálogo
+// ══════════════════════════════════════════════════════
+
+// Muestra u oculta el botón flotante según si el usuario logueado es admin
+function actualizarUIAdmin() {
+  const btn = document.getElementById('btn-admin-fab');
+  if (!btn) return;
+  if (usuarioActual && usuarioActual.es_admin) {
+    btn.classList.remove('hidden');
+  } else {
+    btn.classList.add('hidden');
+  }
+}
+
+// Muestra/oculta el avatar de perfil y le pone la inicial del nombre
+function actualizarUIPerfil() {
+  const btn = document.getElementById('btn-perfil-fab');
+  if (!btn) return;
+  if (usuarioActual && usuarioActual.nombre) {
+    btn.textContent = usuarioActual.nombre.trim().charAt(0).toUpperCase();
+    btn.classList.remove('hidden');
+  } else {
+    btn.classList.add('hidden');
+  }
+}
+
+function abrirModalAdmin() {
+  document.getElementById('modal-admin-agregar').classList.remove('hidden');
+}
+
+async function guardarPlantaAdmin() {
+  const nombre = document.getElementById('adm-nombre').value.trim();
+
+  const categorias = Array.from(
+    document.querySelectorAll('#adm-categorias input[type=checkbox]:checked')
+  ).map(c => c.value);
+
+  const estadoDiv = document.getElementById('adm-estado');
+
+  if (!nombre || categorias.length === 0) {
+    estadoDiv.style.color = 'var(--rojo)';
+    estadoDiv.textContent = 'Nombre y al menos una categoría son obligatorios.';
+    return;
+  }
+
+  const body = {
+    usuario_id:           usuarioActual.id,
+    nombre:                nombre,
+    cientifico:            document.getElementById('adm-cientifico').value.trim(),
+    emoji:                 document.getElementById('adm-emoji').value.trim() || '🌱',
+    categoria:             categorias.join(','),
+    tags:                  document.getElementById('adm-tags').value.trim() || null,
+    dias_riego:            document.getElementById('adm-diasriego').value,
+    luz:                   document.getElementById('adm-luz').value.trim(),
+    meses_siembra_sur:     document.getElementById('adm-mesessur').value.trim(),
+    meses_siembra_norte:   document.getElementById('adm-mesesnorte').value.trim(),
+    dificultad:            document.getElementById('adm-dificultad').value,
+    descripcion:           document.getElementById('adm-descripcion').value.trim(),
+    cuidados:              document.getElementById('adm-cuidados').value.trim(),
+    curiosidad:            document.getElementById('adm-curiosidad').value.trim() || null,
+    advertencia:           document.getElementById('adm-advertencia').value.trim() || null,
+    imagen:                document.getElementById('adm-imagen').value.trim(),
+    destacada:             document.getElementById('adm-destacada').checked ? 1 : 0,
+  };
+
+  estadoDiv.style.color = 'var(--verde-medio)';
+  estadoDiv.textContent = 'Guardando...';
+
+  try {
+    const respuesta = await fetch(`${API}/agregar_planta.php`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(body)
+    });
+    const datos = await respuesta.json();
+
+    if (datos.exito) {
+      estadoDiv.style.color = 'var(--verde-medio)';
+      estadoDiv.textContent = '✅ Planta agregada.';
+
+      // Recargar el catálogo desde MySQL para que aparezca ya mismo
+      await cargarPlantas();
+      renderBuscar(document.getElementById('input-buscar')?.value || '');
+
+      setTimeout(() => {
+        cerrarModal('modal-admin-agregar');
+        document.getElementById('adm-estado').textContent = '';
+        document.querySelectorAll('#adm-categorias input[type=checkbox]').forEach(c => c.checked = false);
+        ['adm-nombre','adm-cientifico','adm-tags','adm-diasriego','adm-luz','adm-mesessur',
+         'adm-mesesnorte','adm-descripcion','adm-cuidados','adm-curiosidad','adm-advertencia','adm-imagen']
+         .forEach(id => document.getElementById(id).value = '');
+        document.getElementById('adm-destacada').checked = false;
+        document.getElementById('adm-emoji').value = '🌱';
+      }, 900);
+
+    } else {
+      estadoDiv.style.color = 'var(--rojo)';
+      estadoDiv.textContent = '❌ ' + datos.mensaje;
+    }
+  } catch (e) {
+    estadoDiv.style.color = 'var(--rojo)';
+    estadoDiv.textContent = '❌ Error de conexión.';
+    console.error(e);
+  }
+}
+
+// ══════════════════════════════════════════════════════
+//  PANTALLA: MI PERFIL
+// ══════════════════════════════════════════════════════
+
+async function renderPerfil() {
+  if (!usuarioActual) return;
+
+  try {
+    const r = await fetch(`${API}/perfil.php?usuario_id=${usuarioActual.id}`);
+    const d = await r.json();
+
+    if (!d.exito) {
+      console.error(d.mensaje);
+      return;
+    }
+
+    const inicial = d.usuario.nombre.trim().charAt(0).toUpperCase();
+    document.getElementById('perfil-avatar-grande').textContent = inicial;
+    document.getElementById('perfil-nombre').textContent = d.usuario.nombre;
+    document.getElementById('perfil-email').textContent = d.usuario.email;
+
+    // "Miembro desde junio de 2026"
+    const fecha = new Date(d.usuario.fecha_registro.replace(' ', 'T'));
+    const texto = fecha.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
+    document.getElementById('perfil-desde').textContent = 'Miembro desde ' + texto;
+
+    // Resaltar el hemisferio activo (usa la variable global `hemisferio`)
+    document.getElementById('perfil-btn-sur').classList.toggle('activo', hemisferio === 'sur');
+    document.getElementById('perfil-btn-norte').classList.toggle('activo', hemisferio === 'norte');
+
+    // Resaltar el tema activo
+    const temaActual = localStorage.getItem('ru-tema') || 'claro';
+    document.getElementById('perfil-btn-claro').classList.toggle('activo', temaActual === 'claro');
+    document.getElementById('perfil-btn-oscuro').classList.toggle('activo', temaActual === 'oscuro');
+
+    // Estadísticas
+    const s = d.stats;
+    document.getElementById('perfil-stats').innerHTML = `
+      <div class="stat-card">
+        <div class="stat-num">${s.total_plantas}</div>
+        <div class="stat-label">Plantas propias</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num">${s.total_favoritas}</div>
+        <div class="stat-label">Favoritas</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num">${s.total_riegos}</div>
+        <div class="stat-label">Riegos registrados</div>
+      </div>`;
+
+  } catch (e) {
+    console.error('Error cargando perfil:', e);
+  }
+}
+
+// Cambia el hemisferio desde la pantalla de perfil (sin navegar a otra pantalla)
+async function cambiarHemisferioPerfil(opcion) {
+  hemisferio = opcion;
+  localStorage.setItem('ru-hemisferio', opcion);
+
+  document.getElementById('perfil-btn-sur').classList.toggle('activo', opcion === 'sur');
+  document.getElementById('perfil-btn-norte').classList.toggle('activo', opcion === 'norte');
+
+  try {
+    await fetch(`${API}/actualizar_hemisferio.php`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ usuario_id: usuarioActual.id, hemisferio: opcion })
+    });
+  } catch (e) {
+    console.error('Error actualizando hemisferio:', e);
+  }
 }
 
 // ══════════════════════════════════════════════════════
 //  PANTALLA: INICIO
 // ══════════════════════════════════════════════════════
 
-function renderInicio() {
-  // Saludo según hora del día
-  const hora = new Date().getHours();
+async function renderInicio() {
+  // Saludo según hora
+  const hora   = new Date().getHours();
   const saludo = hora < 12 ? 'Buenos días' : hora < 20 ? 'Buenas tardes' : 'Buenas noches';
   document.getElementById('saludo-hora').textContent = saludo;
 
-  // Stats
-  const favoritas  = cargarFavoritas();
-  const misPlantas = cargarMisPlantas();
-  const urgentes   = misPlantas.filter(p => diasHastaRiego(p) <= 0).length;
+  if (usuarioActual) {
+    document.getElementById('saludo-nombre').textContent = `Hola, ${usuarioActual.nombre} 👋`;
+  }
+
+  // Estadísticas
+  const urgentes = misPlantasCache.filter(p => diasHastaRiego(p) <= 0).length;
 
   document.getElementById('stats-row').innerHTML = `
     <div class="stat-card">
@@ -51,26 +632,28 @@ function renderInicio() {
       <div class="stat-label">Plantas en la guía</div>
     </div>
     <div class="stat-card">
-      <div class="stat-num">${favoritas.length}</div>
+      <div class="stat-num">${Array.isArray(favoritosCache) ? favoritosCache.length : 0}</div>
       <div class="stat-label">Favoritas</div>
     </div>
     <div class="stat-card">
-      <div class="stat-num" style="color:${urgentes > 0 ? 'var(--rojo)' : 'var(--verde-medio)'}">${urgentes}</div>
+      <div class="stat-num" style="color:${urgentes > 0 ? 'var(--rojo)' : 'var(--verde-medio)'}">
+        ${urgentes}
+      </div>
       <div class="stat-label">Riegos urgentes</div>
     </div>`;
 
   // Próximos riegos
   const contenedorRiegos = document.getElementById('proximos-riegos');
-  if (misPlantas.length === 0) {
+  if (misPlantasCache.length === 0) {
     contenedorRiegos.innerHTML = `
       <div style="text-align:center; padding:1rem; color:var(--texto-suave); font-size:14px;">
         Agregá plantas propias para ver los recordatorios de riego
       </div>`;
   } else {
-    const ordenadas = [...misPlantas].sort((a, b) => diasHastaRiego(a) - diasHastaRiego(b));
+    const ordenadas = [...misPlantasCache].sort((a, b) => diasHastaRiego(a) - diasHastaRiego(b));
     contenedorRiegos.innerHTML = ordenadas.slice(0, 4).map(p => {
-      const dias     = diasHastaRiego(p);
-      const planta   = PLANTAS.find(x => x.id === p.plantaId);
+      const dias       = diasHastaRiego(p);
+      const planta     = PLANTAS.find(x => x.id === p.planta_id);
       const claseItem  = dias < 0 ? 'urgente' : dias === 0 ? 'hoy' : '';
       const claseBadge = dias < 0 ? 'badge-rojo' : dias === 0 ? 'badge-amarillo' : 'badge-verde';
       const textoBadge = dias < 0 ? `Venció hace ${Math.abs(dias)}d` : dias === 0 ? '¡Hoy!' : `En ${dias}d`;
@@ -78,7 +661,7 @@ function renderInicio() {
         <div class="riego-item ${claseItem}">
           <div class="riego-emoji">${planta ? planta.emoji : '🌱'}</div>
           <div class="riego-info">
-            <div class="riego-nombre">${p.nombrePersonalizado || planta?.nombre || 'Planta'}</div>
+            <div class="riego-nombre">${p.nombre_personalizado || planta?.nombre || 'Planta'}</div>
             <div class="riego-fecha">Cada ${planta?.diasRiego || '?'} días</div>
           </div>
           <span class="riego-badge ${claseBadge}">${textoBadge}</span>
@@ -98,16 +681,15 @@ function renderInicio() {
 function renderBuscar(filtroTexto = '') {
   let resultado = PLANTAS;
 
-  // Filtrar por categoría
   if (categoriaActual !== 'todas') {
-   resultado = resultado.filter(p => 
-  Array.isArray(p.categoria) 
-    ? p.categoria.includes(categoriaActual) 
-    : p.categoria === categoriaActual
-);
+    const buscado = categoriaActual.toLowerCase();
+    resultado = resultado.filter(p =>
+      Array.isArray(p.categoria)
+        ? p.categoria.some(c => c.toLowerCase() === buscado)
+        : (p.categoria || '').toLowerCase() === buscado
+    );
   }
 
-  // Filtrar por texto
   if (filtroTexto) {
     const q = filtroTexto.toLowerCase();
     resultado = resultado.filter(p =>
@@ -152,8 +734,7 @@ function filtrarCategoria(cat, btn) {
 // ══════════════════════════════════════════════════════
 
 function renderFavoritas() {
-  const ids        = cargarFavoritas();
-  const favoritas  = PLANTAS.filter(p => ids.includes(p.id));
+  const favoritas  = PLANTAS.filter(p => favoritosCache.includes(p.id));
   const contenedor = document.getElementById('lista-favoritas');
   const vacio      = document.getElementById('favoritas-vacio');
 
@@ -166,44 +747,28 @@ function renderFavoritas() {
   }
 }
 
-function toggleFavorita(id, evento) {
-  evento.stopPropagation(); // Evitar que abra el modal
-  const ids = cargarFavoritas();
-  const idx = ids.indexOf(id);
-  if (idx === -1) ids.push(id);
-  else ids.splice(idx, 1);
-  guardarFavoritas(ids);
-
-  // Actualizar el ícono del botón
-  const btn = document.querySelector(`.card-fav-btn[data-id="${id}"]`);
-  if (btn) btn.textContent = ids.includes(id) ? '❤️' : '🤍';
-
-  // Si estamos en favoritas, refrescar la lista
-  if (document.getElementById('pantalla-favoritas').classList.contains('activa')) {
-    renderFavoritas();
-  }
-}
-
 // ══════════════════════════════════════════════════════
 //  PANTALLA: MIS PLANTAS
 // ══════════════════════════════════════════════════════
 
-function renderMisPlantas() {
-  const misPlantas = cargarMisPlantas();
+async function renderMisPlantas() {
+  // Recargar desde MySQL
+  await cargarMisPlantas();
+
   const contenedor = document.getElementById('lista-mis-plantas');
   const vacio      = document.getElementById('mis-plantas-vacio');
 
-  if (misPlantas.length === 0) {
+  if (misPlantasCache.length === 0) {
     contenedor.innerHTML = '';
     vacio.classList.remove('hidden');
     return;
   }
 
   vacio.classList.add('hidden');
-  contenedor.innerHTML = misPlantas.map(p => {
-    const planta = PLANTAS.find(x => x.id === p.plantaId);
+  contenedor.innerHTML = misPlantasCache.map(p => {
+    const planta     = PLANTAS.find(x => x.id === p.planta_id);
     if (!planta) return '';
-    const dias     = diasHastaRiego(p);
+    const dias       = diasHastaRiego(p);
     const claseBadge = dias < 0 ? 'badge-rojo' : dias === 0 ? 'badge-amarillo' : 'badge-verde';
     const textoBadge = dias < 0 ? `Regar hace ${Math.abs(dias)}d` : dias === 0 ? '¡Regar hoy!' : `Regar en ${dias}d`;
 
@@ -211,15 +776,15 @@ function renderMisPlantas() {
       <div class="mi-planta-card">
         <div class="mi-planta-emoji">${planta.emoji}</div>
         <div class="mi-planta-info">
-          <div class="mi-planta-nombre">${p.nombrePersonalizado || planta.nombre}</div>
+          <div class="mi-planta-nombre">${p.nombre_personalizado || planta.nombre}</div>
           <div class="mi-planta-especie">${planta.cientifico}</div>
           <div class="mi-planta-estado">
-            <span class="riego-badge ${claseBadge}" style="margin-right:6px">${textoBadge}</span>
+            <span class="riego-badge ${claseBadge}">${textoBadge}</span>
           </div>
           ${p.notas ? `<div style="font-size:12px;color:var(--texto-suave);margin-bottom:8px;font-style:italic">"${p.notas}"</div>` : ''}
           <div class="mi-planta-acciones">
             <button class="btn-sm btn-sm-verde" onclick="abrirModalRiego(${p.id})">💧 Registrar riego</button>
-            <button class="btn-sm btn-sm-rojo" onclick="eliminarMiPlanta(${p.id})">🗑</button>
+            <button class="btn-sm btn-sm-rojo"  onclick="eliminarMiPlanta(${p.id})">🗑</button>
           </div>
         </div>
       </div>`;
@@ -227,80 +792,90 @@ function renderMisPlantas() {
 }
 
 function abrirModalAgregarPlanta() {
-  // Llenar el select con todas las plantas
   document.getElementById('select-planta').innerHTML =
-    PLANTAS.map(p => `<option value="${p.id}">${p.emoji} ${p.nombre} (${p.cientifico})</option>`).join('');
-
-  // Fecha de hoy por defecto
-  document.getElementById('input-ultimo-riego').value = hoy();
+    PLANTAS.map(p => `<option value="${p.id}">${p.emoji} ${p.nombre}</option>`).join('');
+  document.getElementById('input-ultimo-riego').value  = hoy();
   document.getElementById('input-nombre-planta').value = '';
-  document.getElementById('input-notas').value = '';
-
+  document.getElementById('input-notas').value         = '';
   document.getElementById('modal-agregar').classList.remove('hidden');
 }
 
-function guardarMiPlanta() {
-  const plantaId         = parseInt(document.getElementById('select-planta').value);
+async function guardarMiPlanta() {
+  const plantaId            = parseInt(document.getElementById('select-planta').value);
   const nombrePersonalizado = document.getElementById('input-nombre-planta').value.trim();
-  const ultimoRiego      = document.getElementById('input-ultimo-riego').value;
-  const notas            = document.getElementById('input-notas').value.trim();
+  const ultimoRiego         = document.getElementById('input-ultimo-riego').value;
+  const notas               = document.getElementById('input-notas').value.trim();
 
-  if (!ultimoRiego) { alert('Por favor ingresá la fecha del último riego'); return; }
+  if (!ultimoRiego) { alert('Ingresá la fecha del último riego'); return; }
+  if (!usuarioActual) return;
 
-  const misPlantas = cargarMisPlantas();
-  misPlantas.push({
-    id:                 Date.now(),
-    plantaId,
-    nombrePersonalizado,
-    ultimoRiego,
-    notas,
-    historialRiegos:    [ultimoRiego]
-  });
-
-  guardarMisPlantas(misPlantas);
-  cerrarModal('modal-agregar');
-  renderMisPlantas();
+  try {
+    const r = await fetch(`${API}/mis_plantas.php`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({
+        accion:             'agregar',
+        usuario_id:         usuarioActual.id,
+        planta_id:          plantaId,
+        nombre_personalizado: nombrePersonalizado,
+        ultimo_riego:       ultimoRiego,
+        notas
+      })
+    });
+    const d = await r.json();
+    if (d.exito) {
+      cerrarModal('modal-agregar');
+      await renderMisPlantas();
+    } else {
+      alert('Error al guardar: ' + d.mensaje);
+    }
+  } catch (e) {
+    alert('Error de conexión');
+  }
 }
 
-function eliminarMiPlanta(id) {
+async function eliminarMiPlanta(id) {
   if (!confirm('¿Eliminar esta planta de tu lista?')) return;
-  const misPlantas = cargarMisPlantas().filter(p => p.id !== id);
-  guardarMisPlantas(misPlantas);
-  renderMisPlantas();
+  try {
+    const r = await fetch(`${API}/mis_plantas.php`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ accion: 'eliminar', id })
+    });
+    const d = await r.json();
+    if (d.exito) await renderMisPlantas();
+  } catch (e) {
+    console.error('Error eliminando planta:', e);
+  }
 }
 
 // ══════════════════════════════════════════════════════
 //  PANTALLA: RECORDATORIOS
 // ══════════════════════════════════════════════════════
 
-function renderRecordatorios() {
-  const misPlantas = cargarMisPlantas();
+async function renderRecordatorios() {
+  await cargarMisPlantas();
+
   const contenedor = document.getElementById('lista-recordatorios');
   const vacio      = document.getElementById('recordatorios-vacio');
 
-  if (misPlantas.length === 0) {
+  if (misPlantasCache.length === 0) {
     contenedor.innerHTML = '';
     vacio.classList.remove('hidden');
     return;
   }
 
   vacio.classList.add('hidden');
-
-  // Ordenar por urgencia
-  const ordenadas = [...misPlantas].sort((a, b) => diasHastaRiego(a) - diasHastaRiego(b));
+  const ordenadas = [...misPlantasCache].sort((a, b) => diasHastaRiego(a) - diasHastaRiego(b));
 
   contenedor.innerHTML = ordenadas.map(p => {
-    const planta = PLANTAS.find(x => x.id === p.plantaId);
+    const planta        = PLANTAS.find(x => x.id === p.planta_id);
     if (!planta) return '';
-
-    const dias     = diasHastaRiego(p);
-    const ciclo    = planta.diasRiego;
-
-    // Calcular porcentaje de la barra
-    const porcentaje = Math.max(0, Math.min(100, ((ciclo - dias) / ciclo) * 100));
+    const dias          = diasHastaRiego(p);
+    const ciclo         = planta.diasRiego;
+    const porcentaje    = Math.max(0, Math.min(100, ((ciclo - dias) / ciclo) * 100));
     const claseUrgencia = dias < 0 ? 'urgente' : dias <= 2 ? 'pronto' : '';
-
-    const textoDias = dias < 0
+    const textoDias     = dias < 0
       ? `⚠️ Venció hace ${Math.abs(dias)} día${Math.abs(dias) !== 1 ? 's' : ''}`
       : dias === 0 ? '💧 ¡Regar hoy!'
       : `Faltan ${dias} día${dias !== 1 ? 's' : ''}`;
@@ -310,7 +885,7 @@ function renderRecordatorios() {
         <div class="rec-header">
           <div class="rec-emoji">${planta.emoji}</div>
           <div>
-            <div class="rec-titulo">${p.nombrePersonalizado || planta.nombre}</div>
+            <div class="rec-titulo">${p.nombre_personalizado || planta.nombre}</div>
             <div class="rec-especie">${planta.cientifico}</div>
           </div>
         </div>
@@ -330,36 +905,55 @@ function renderRecordatorios() {
 // ══════════════════════════════════════════════════════
 
 function abrirModalRiego(miPlantaId) {
-  plantaRiegoId = miPlantaId;
-  const p      = cargarMisPlantas().find(x => x.id === miPlantaId);
-  const planta = PLANTAS.find(x => x.id === p?.plantaId);
+  plantaRiegoId   = miPlantaId;
+  const p         = misPlantasCache.find(x => x.id === miPlantaId);
+  const planta    = PLANTAS.find(x => x.id === p?.planta_id);
 
   document.getElementById('modal-riego-nombre').textContent =
-    p?.nombrePersonalizado || planta?.nombre || 'Mi planta';
+    p?.nombre_personalizado || planta?.nombre || 'Mi planta';
   document.getElementById('input-fecha-riego').value = hoy();
-  document.getElementById('input-nota-riego').value = '';
+  document.getElementById('input-nota-riego').value  = '';
   document.getElementById('modal-riego').classList.remove('hidden');
 }
 
-function confirmarRiego() {
+async function confirmarRiego() {
   const fecha = document.getElementById('input-fecha-riego').value;
+  const nota  = document.getElementById('input-nota-riego').value;
   if (!fecha) { alert('Ingresá la fecha del riego'); return; }
+  if (!usuarioActual) return;
 
-  const misPlantas = cargarMisPlantas();
-  const idx = misPlantas.findIndex(p => p.id === plantaRiegoId);
-  if (idx === -1) return;
+  const p = misPlantasCache.find(x => x.id === plantaRiegoId);
+  if (!p) return;
 
-  misPlantas[idx].ultimoRiego = fecha;
-  if (!misPlantas[idx].historialRiegos) misPlantas[idx].historialRiegos = [];
-  misPlantas[idx].historialRiegos.push(fecha);
+  try {
+    const r = await fetch(`${API}/riegos.php`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({
+        usuario_id:  usuarioActual.id,
+        planta_id:   p.planta_id,
+        fecha_riego: fecha,
+        notas:       nota
+      })
+    });
+    const d = await r.json();
+    if (d.exito) {
+      // Actualizar el ultimo_riego y la nota en la caché local
+      const idx = misPlantasCache.findIndex(x => x.id === plantaRiegoId);
+      if (idx !== -1) {
+        misPlantasCache[idx].ultimo_riego = fecha;
+        misPlantasCache[idx].notas = nota;
+      }
 
-  guardarMisPlantas(misPlantas);
-  cerrarModal('modal-riego');
+      cerrarModal('modal-riego');
 
-  // Refrescar la pantalla activa
-  if (document.getElementById('pantalla-mis-plantas').classList.contains('activa'))   renderMisPlantas();
-  if (document.getElementById('pantalla-recordatorios').classList.contains('activa')) renderRecordatorios();
-  if (document.getElementById('pantalla-inicio').classList.contains('activa'))        renderInicio();
+      if (document.getElementById('pantalla-mis-plantas').classList.contains('activa'))   await renderMisPlantas();
+      if (document.getElementById('pantalla-recordatorios').classList.contains('activa')) await renderRecordatorios();
+      if (document.getElementById('pantalla-inicio').classList.contains('activa'))        await renderInicio();
+    }
+  } catch (e) {
+    console.error('Error registrando riego:', e);
+  }
 }
 
 // ══════════════════════════════════════════════════════
@@ -367,19 +961,40 @@ function confirmarRiego() {
 // ══════════════════════════════════════════════════════
 
 function abrirDetalle(id) {
-  const p   = PLANTAS.find(x => x.id === id);
+  const p = PLANTAS.find(x => x.id === id);
   if (!p) return;
 
-  const fav = cargarFavoritas().includes(id);
-  const dificultadColor = p.dificultad === 'Fácil' ? 'var(--verde-medio)' : 'var(--amarillo)';
+  const fav             = favoritosCache.includes(id);
+  const dificultadColor = p.dificultad === 'Fácil' ? 'var(--verde-medio)' : p.dificultad === 'Media' ? 'var(--amarillo)' : 'var(--rojo)';
+  const meses           = hemisferio === 'norte' && p.mesesSiembraNorte
+    ? p.mesesSiembraNorte
+    : p.mesesSiembra;
 
   document.getElementById('modal-planta-contenido').innerHTML = `
-    <div class="detalle-hero">
-      <div class="detalle-emoji">${p.emoji}</div>
-      <div class="detalle-nombre">${p.nombre}</div>
-      <div class="detalle-cientifico">${p.cientifico}</div>
-    </div>
-
+  <div class="detalle-hero">
+  ${p.imagen ? (() => {
+  const imgs = p.imagen.split(',').map(u => u.trim()).filter(Boolean);
+  if (imgs.length === 1) {
+    return `<img src="${imgs[0]}" alt="${p.nombre}" style="width:100%; height:200px; object-fit:cover; border-radius:12px; margin-bottom:12px;">`;
+  }
+  return `
+    <div class="swiper detalle-swiper" style="border-radius:12px; margin-bottom:12px;">
+      <div class="swiper-wrapper">
+        ${imgs.map(url => `
+          <div class="swiper-slide">
+            <img src="${url}" alt="${p.nombre}" style="width:100%; height:200px; object-fit:cover;">
+          </div>`).join('')}
+      </div>
+      <div class="swiper-pagination"></div>
+    </div>`;
+})() : `<div class="detalle-emoji">${p.emoji}</div>`}
+  <div class="detalle-nombre">${p.nombre}</div>
+  ${p.advertencia ? `
+  <div style="background:#fdeaea; color:#c0392b; border:1px solid #e74c3c; border-radius:8px; padding:8px 12px; font-size:13px; margin:8px 0; text-align:center;">
+    ⚠️ ${p.advertencia}
+  </div>` : ''}
+  <div class="detalle-cientifico">${p.cientifico}</div>
+</div>
     <div class="detalle-fichas">
       <div class="ficha">
         <div class="ficha-icono">💧</div>
@@ -394,7 +1009,7 @@ function abrirDetalle(id) {
       <div class="ficha">
         <div class="ficha-icono">📅</div>
         <div class="ficha-label">Mejor época</div>
-        <div class="ficha-valor">${p.mesesSiembra}</div>
+        <div class="ficha-valor">${meses}</div>
       </div>
       <div class="ficha">
         <div class="ficha-icono">⭐</div>
@@ -402,21 +1017,20 @@ function abrirDetalle(id) {
         <div class="ficha-valor" style="color:${dificultadColor}">${p.dificultad}</div>
       </div>
     </div>
-
     <div class="detalle-seccion">
       <h4>Descripción</h4>
       <p>${p.descripcion}</p>
     </div>
-
     <div class="detalle-seccion">
       <h4>Cuidados</h4>
       <p>${p.cuidados}</p>
     </div>
-
     <div class="detalle-seccion">
       <h4>¿Sabías que...?</h4>
       <p style="font-style:italic; color:var(--verde-medio)">${p.curiosidad}</p>
     </div>
+
+    <div id="variedades-contenedor"></div>
 
     <div class="detalle-acciones">
       <button class="btn-accion-outline" onclick="toggleFavoritaDesdeDetalle(${p.id})" id="btn-fav-detalle">
@@ -426,38 +1040,117 @@ function abrirDetalle(id) {
         🪴 Agregar a mis plantas
       </button>
     </div>`;
-
   document.getElementById('modal-planta').classList.remove('hidden');
+  // Cargar variedades si existen
+cargarVariedades(p.id);
+  // Inicializar el carrusel si existe
+setTimeout(() => {
+  const swiperEl = document.querySelector('.detalle-swiper');
+  if (swiperEl) {
+    new Swiper('.detalle-swiper', {
+      pagination: { el: '.swiper-pagination', clickable: true },
+      loop: true
+    });
+  }
+}, 100);
+}
+async function cargarVariedades(plantaId) {
+  try {
+    const r = await fetch(`${API}/variedades.php?planta_id=${plantaId}`);
+    const d = await r.json();
+
+    const contenedor = document.getElementById('variedades-contenedor');
+    if (!contenedor) return;
+
+    if (!d.exito || d.variedades.length === 0) {
+      contenedor.innerHTML = '';
+      return;
+    }
+
+    contenedor.innerHTML = `
+      <div class="detalle-seccion">
+        <h4>Variedades</h4>
+        <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;">
+          ${d.variedades.map(v => `
+            <button class="filtro-btn" onclick="mostrarVariedad(${JSON.stringify(v).replace(/"/g, '&quot;')})">
+              ${v.emoji || '🌿'} ${v.nombre}
+            </button>`).join('')}
+        </div>
+      </div>`;
+  } catch (e) {
+    console.error('Error cargando variedades:', e);
+  }
 }
 
-function toggleFavoritaDesdeDetalle(id) {
-  const ids = cargarFavoritas();
-  const idx = ids.indexOf(id);
-  if (idx === -1) ids.push(id);
-  else ids.splice(idx, 1);
-  guardarFavoritas(ids);
+function mostrarVariedad(v) {
+  document.getElementById('modal-planta-contenido').innerHTML = `
+    <button onclick="cerrarModal('modal-planta')" style="position:absolute;top:14px;right:14px;background:var(--fondo);border:none;width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:14px;color:var(--texto-suave);">✕</button>
+    <button onclick="abrirDetalle(${v.planta_id})" style="position:absolute;top:14px;left:14px;background:var(--fondo);border:none;width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:14px;color:var(--texto-suave);">←</button>
 
-  const btn = document.getElementById('btn-fav-detalle');
-  if (btn) btn.textContent = ids.includes(id) ? '❤️ En favoritas' : '🤍 Agregar favorita';
+    <div class="detalle-hero">
+      ${v.imagen
+        ? `<img src="${v.imagen}" alt="${v.nombre}" style="width:100%; height:200px; object-fit:cover; border-radius:12px; margin-bottom:12px;">`
+        : `<div class="detalle-emoji">🌿</div>`}
+      <div class="detalle-nombre">${v.nombre}</div>
+      <div class="detalle-cientifico">${v.cientifico || ''}</div>
+    </div>
+
+    <div class="detalle-fichas">
+      <div class="ficha">
+        <div class="ficha-icono">💧</div>
+        <div class="ficha-label">Riego</div>
+        <div class="ficha-valor">Cada ${v.dias_riego} días</div>
+      </div>
+      <div class="ficha">
+        <div class="ficha-icono">☀️</div>
+        <div class="ficha-label">Luz</div>
+        <div class="ficha-valor">${v.luz || 'No especificado'}</div>
+      </div>
+      <div class="ficha">
+        <div class="ficha-icono">📅</div>
+        <div class="ficha-label">Mejor época</div>
+        <div class="ficha-valor">${hemisferio === 'norte' && v.meses_siembra_norte ? v.meses_siembra_norte : v.meses_siembra_sur || 'No especificado'}</div>
+      </div>
+      <div class="ficha">
+        <div class="ficha-icono">⭐</div>
+        <div class="ficha-label">Dificultad</div>
+       <div class="ficha-valor" style="color:${v.dificultad === 'Fácil' ? 'var(--verde-medio)' : v.dificultad === 'Media' ? 'var(--amarillo)' : v.dificultad === 'Difícil' ? 'var(--rojo)' : 'var(--texto)'}">${v.dificultad || 'No especificado'}</div>
+      </div>
+    </div>
+
+    <div class="detalle-seccion">
+      <h4>Descripción</h4>
+      <p>${v.descripcion || ''}</p>
+    </div>
+
+    <div class="detalle-seccion">
+      <h4>Cuidados</h4>
+      <p>${v.cuidados || ''}</p>
+    </div>
+
+    ${v.curiosidad ? `
+    <div class="detalle-seccion">
+      <h4>¿Sabías que...?</h4>
+      <p style="font-style:italic; color:var(--verde-medio)">${v.curiosidad}</p>
+    </div>` : ''}`;
 }
 
 function agregarDesdeDetalle(plantaId) {
   cerrarModal('modal-planta');
   abrirModalAgregarPlanta();
-  // Pre-seleccionar la planta
   setTimeout(() => {
     document.getElementById('select-planta').value = plantaId;
   }, 100);
 }
 
+// ══════════════════════════════════════════════════════
+//  FUNCIONES DE AYUDA
+// ══════════════════════════════════════════════════════
 
-/**
- * Genera el HTML de una card de planta
- */
+// Genera el HTML de una card de planta
 function cardPlantaHTML(p) {
-  const favoritas = cargarFavoritas();
-  const esFav     = favoritas.includes(p.id);
-  const tagHTML   = p.tags.slice(0, 2).map(t =>
+  const esFav   = favoritosCache.includes(p.id);
+  const tagHTML = p.tags.slice(0, 2).map(t =>
     `<span class="tag tag-verde">${t}</span>`).join('');
 
   return `
@@ -480,15 +1173,13 @@ function cardPlantaHTML(p) {
     </div>`;
 }
 
-/**
- * Calcula los días que faltan para el próximo riego
- * Número negativo = ya venció
- */
+// Calcula los días hasta el próximo riego
+// Usa ultimo_riego (campo de MySQL) en vez de ultimoRiego (localStorage)
 function diasHastaRiego(miPlanta) {
-  const planta      = PLANTAS.find(x => x.id === miPlanta.plantaId);
-  if (!planta || !miPlanta.ultimoRiego) return 0;
+  const planta = PLANTAS.find(x => x.id === miPlanta.planta_id);
+  if (!planta || !miPlanta.ultimo_riego) return 0;
 
-  const ultimoRiego = new Date(miPlanta.ultimoRiego + 'T00:00:00');
+  const ultimoRiego = new Date(miPlanta.ultimo_riego + 'T00:00:00');
   const proximo     = new Date(ultimoRiego);
   proximo.setDate(proximo.getDate() + planta.diasRiego);
 
@@ -498,20 +1189,31 @@ function diasHastaRiego(miPlanta) {
   return Math.round((proximo - ahora) / (1000 * 60 * 60 * 24));
 }
 
-/**
- * Devuelve la fecha de hoy
- */
+// Devuelve la fecha de hoy en formato YYYY-MM-DD
 function hoy() {
   return new Date().toISOString().split('T')[0];
 }
 
-/**
- * Cierra un modal por su ID
- */
+// Cierra un modal
 function cerrarModal(id) {
   document.getElementById(id).classList.add('hidden');
 }
+
 // ══════════════════════════════════════════════════════
 //  INICIO DE LA APP
 // ══════════════════════════════════════════════════════
-irA('inicio');
+emailjs.init('gR1az2PRfTIZYX3BC');
+cargarHemisferio();
+cargarTema();
+usuarioActual = cargarUsuario();
+actualizarUIAdmin();
+actualizarUIPerfil();
+
+// Primero cargar las plantas desde MySQL, después iniciar la app
+cargarPlantas().then(() => {
+  if (usuarioActual) {
+    Promise.all([cargarFavoritas(), cargarMisPlantas()]).then(() => irA('inicio'));
+  } else {
+    irA('login');
+  }
+});
