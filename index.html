@@ -6,15 +6,129 @@
   <title>RootUp</title>
   <link rel="stylesheet" href="style.css" />
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;1,500&family=Outfit:wght@300;400;500&display=swap" rel="stylesheet" />
-  <link rel="icon" type="image" href="rootup.jpg">
 </head>
 <body>
 
   <!-- ═══════════════════════════════
-       NAVBAR INFERIOR (navegación)
+       MODAL: SELECCIÓN DE HEMISFERIO
+       Aparece una sola vez al registrarse
   ═══════════════════════════════ -->
-  <nav class="navbar">
-    <button class="nav-btn active" onclick="irA('inicio')" id="nav-inicio">
+  <div id="modal-hemisferio" class="modal-overlay hidden" onclick="event.stopPropagation()">
+    <div class="modal-card" onclick="event.stopPropagation()">
+      <h3 class="modal-titulo">🌍 ¿Dónde estás?</h3>
+      <p style="font-size:14px; color:var(--texto-suave); margin-bottom:1.5rem;">
+        Los meses de siembra cambian según tu ubicación.
+      </p>
+      <button class="btn-accion full" onclick="elegirHemisferio('sur')" style="margin-bottom:10px">
+        🇦🇷 Hemisferio Sur (Argentina, Chile, Brasil...)
+      </button>
+      <button class="btn-accion full" style="background:var(--tierra)" onclick="elegirHemisferio('norte')">
+        🇺🇸 Hemisferio Norte (EE.UU., Europa, México...)
+      </button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════
+       PANTALLA: LOGIN
+  ═══════════════════════════════ -->
+  <div id="pantalla-login" class="pantalla activa">
+    <div class="inicio-hero">
+      <div class="hero-deco"></div>
+      <div class="hero-content">
+        <img src="../img/logo-rootup-blanco.png" alt="RootUp" class="logo-hero" style="height:56px; margin-bottom:1rem;" />
+        <h1 class="hero-titulo">RootUp</h1>
+        <p class="hero-sub">Tu guía inteligente de plantas</p>
+      </div>
+    </div>
+
+    <div class="seccion-padding">
+      <div class="seccion-titulo">Iniciar sesión</div>
+
+      <label class="form-label">Email</label>
+      <input type="email" id="login-email" class="form-input" placeholder="tu@email.com" />
+
+      <label class="form-label">Contraseña</label>
+      <input type="password" id="login-password" class="form-input" placeholder="Tu contraseña..." />
+
+      <button class="btn-accion full" onclick="iniciarSesion()">Entrar</button>
+      <p style="text-align:center; margin-top:0.75rem; font-size:13px; color:var(--texto-suave);">
+  <span style="color:var(--verde-medio); cursor:pointer;" onclick="irA('recuperar')">
+    ¿Olvidaste tu contraseña?
+  </span>
+</p>
+
+      <p style="text-align:center; margin-top:1rem; font-size:14px; color:var(--texto-suave);">
+        ¿No tenés cuenta?
+        <span style="color:var(--verde-medio); cursor:pointer;" onclick="irA('registro')">Registrate</span>
+      </p>
+
+      <div id="login-error" style="color:var(--rojo); font-size:13px; text-align:center; margin-top:8px;"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════
+       PANTALLA: REGISTRO
+  ═══════════════════════════════ -->
+  <div id="pantalla-registro" class="pantalla">
+    <div style="text-align:center; padding:1.5rem 0 0.25rem; background:var(--verde-oscuro);">
+      <img src="../img/logo-rootup-blanco.png" alt="RootUp" class="logo-hero" style="height:44px; margin:0 auto;" />
+    </div>
+    <div class="topbar-simple">
+      <h2>Crear cuenta</h2>
+    </div>
+
+    <div class="seccion-padding">
+      <label class="form-label">Nombre</label>
+      <input type="text" id="registro-nombre" class="form-input" placeholder="Tu nombre..." maxlength="100" />
+
+      <label class="form-label">Email</label>
+      <input type="email" id="registro-email" class="form-input" placeholder="tu@email.com" />
+
+      <label class="form-label">Contraseña</label>
+      <input type="password" id="registro-password" class="form-input" placeholder="Mínimo 6 caracteres..." />
+
+      <button class="btn-accion full" onclick="registrarUsuario()">Crear cuenta</button>
+
+      <p style="text-align:center; margin-top:1rem; font-size:14px; color:var(--texto-suave);">
+        ¿Ya tenés cuenta?
+        <span style="color:var(--verde-medio); cursor:pointer;" onclick="irA('login')">Iniciá sesión</span>
+      </p>
+
+      <div id="registro-error" style="color:var(--rojo); font-size:13px; text-align:center; margin-top:8px;"></div>
+      <div id="registro-exito" style="color:var(--verde-medio); font-size:13px; text-align:center; margin-top:8px;"></div>
+    </div>
+  </div>
+
+  <!-- PANTALLA: RECUPERAR CONTRASEÑA -->
+<div id="pantalla-recuperar" class="pantalla">
+  <div class="topbar-simple">
+    <h2>Recuperar contraseña</h2>
+  </div>
+  <div class="seccion-padding">
+    <p style="font-size:14px; color:var(--texto-suave); margin-bottom:1.5rem;">
+      Ingresá tu email y te enviamos un link para restablecer tu contraseña.
+    </p>
+
+    <label class="form-label">Email</label>
+    <input type="email" id="recuperar-email" class="form-input" placeholder="tu@email.com" />
+
+    <button class="btn-accion full" onclick="solicitarRecuperacion()">Enviar link</button>
+
+    <p style="text-align:center; margin-top:1rem; font-size:14px; color:var(--texto-suave);">
+      <span style="color:var(--verde-medio); cursor:pointer;" onclick="irA('login')">Volver al login</span>
+    </p>
+
+    <div id="recuperar-error" style="color:var(--rojo); font-size:13px; text-align:center; margin-top:8px;"></div>
+    <div id="recuperar-exito" style="color:var(--verde-medio); font-size:13px; text-align:center; margin-top:8px;"></div>
+  </div>
+</div>
+
+  <!-- ═══════════════════════════════
+       NAVBAR INFERIOR (navegación)
+       Solo visible cuando el usuario está logueado
+  ═══════════════════════════════ -->
+  <nav class="navbar hidden" id="navbar">
+    <button class="nav-btn" onclick="irA('inicio')" id="nav-inicio">
       <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
       <span>Inicio</span>
     </button>
@@ -39,30 +153,26 @@
   <!-- ═══════════════════════════════
        PANTALLA: INICIO
   ═══════════════════════════════ -->
-</div>
-  <div id="pantalla-inicio" class="pantalla activa">
+  <div id="pantalla-inicio" class="pantalla">
     <div class="inicio-hero">
       <div class="hero-deco"></div>
       <div class="hero-content">
         <p class="hero-saludo" id="saludo-hora">Buenos días</p>
         <h1 class="hero-titulo">RootUp</h1>
-        <p class="hero-sub">Tu guía inteligente de plantas</p>
+        <p class="hero-sub" id="saludo-nombre">Tu guía inteligente de plantas</p>
       </div>
+
+      <!-- Avatar de perfil: siempre visible logueado. Botón admin: solo admins, debajo del avatar -->
+      <button id="btn-perfil-fab" class="btn-perfil-fab hidden" onclick="irA('perfil')" title="Mi perfil"></button>
+      <button id="btn-admin-fab" class="btn-admin-fab hidden" onclick="abrirModalAdmin()" title="Agregar planta">＋</button>
     </div>
 
     <div class="seccion-padding">
-
-      <!-- Estadísticas rápidas -->
       <div class="stats-row" id="stats-row"></div>
-
-      <!-- Próximos riegos -->
       <div class="seccion-titulo">Próximos riegos</div>
       <div id="proximos-riegos" class="lista-riegos"></div>
-
-      <!-- Plantas destacadas -->
       <div class="seccion-titulo" style="margin-top:1.5rem">Plantas destacadas</div>
       <div id="plantas-destacadas" class="grid-plantas"></div>
-
     </div>
   </div>
 
@@ -89,6 +199,7 @@
         <button class="filtro-btn" onclick="filtrarCategoria('árboles', this)">Árboles</button>
         <button class="filtro-btn" onclick="filtrarCategoria('cactus', this)">Cactus</button>
         <button class="filtro-btn" onclick="filtrarCategoria('Aromáticas', this)">Aromáticas</button>
+        <button class="filtro-btn" onclick="filtrarCategoria('medicinal', this)">Medicinal</button>
       </div>
 
       <div id="resultados-buscar" class="grid-plantas"></div>
@@ -123,7 +234,7 @@
     <div class="seccion-padding">
       <div id="lista-mis-plantas" class="lista-mis-plantas"></div>
       <div id="mis-plantas-vacio" class="estado-vacio hidden">
-        <div class="vacio-emoji">🪴</div>
+        <div class="vacio-emoji">🌿</div>
         <p>Agregá tu primera planta para hacer seguimiento</p>
         <button class="btn-accion" onclick="abrirModalAgregarPlanta()">Agregar planta</button>
       </div>
@@ -143,6 +254,45 @@
         <div class="vacio-emoji">🔔</div>
         <p>No hay alertas pendientes</p>
         <p style="font-size:13px;color:var(--texto-suave);margin-top:4px">Agregá plantas propias para recibir alertas</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════
+       PANTALLA: MI PERFIL
+  ═══════════════════════════════ -->
+  <div id="pantalla-perfil" class="pantalla">
+    <div class="topbar-simple">
+      <h2>Mi perfil</h2>
+    </div>
+    <div class="seccion-padding">
+
+      <div style="display:flex; flex-direction:column; align-items:center; margin-bottom:1.5rem;">
+        <div id="perfil-avatar-grande" style="width:80px;height:80px;border-radius:50%;background:var(--verde-medio);color:white;display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:600;font-family:'Playfair Display',serif;margin-bottom:0.75rem;"></div>
+        <div style="font-size:18px;font-weight:600;color:var(--verde-oscuro);" id="perfil-nombre"></div>
+        <div style="font-size:13px;color:var(--texto-suave);" id="perfil-email"></div>
+        <div style="font-size:12px;color:var(--texto-suave);margin-top:4px;" id="perfil-desde"></div>
+        <p style="font-size:11px;color:var(--texto-suave);margin-top:6px;">📷 Foto de perfil: próximamente</p>
+      </div>
+
+      <div class="seccion-titulo">Hemisferio</div>
+      <div class="filtros-row">
+        <button class="filtro-btn" id="perfil-btn-sur" onclick="cambiarHemisferioPerfil('sur')">🇦🇷 Sur</button>
+        <button class="filtro-btn" id="perfil-btn-norte" onclick="cambiarHemisferioPerfil('norte')">🇺🇸 Norte</button>
+      </div>
+
+      <div class="seccion-titulo" style="margin-top:1.5rem">Apariencia</div>
+      <div class="filtros-row">
+        <button class="filtro-btn" id="perfil-btn-claro" onclick="cambiarTema('claro')">☀️ Claro</button>
+        <button class="filtro-btn" id="perfil-btn-oscuro" onclick="cambiarTema('oscuro')">🌙 Oscuro</button>
+      </div>
+
+      <div class="seccion-titulo" style="margin-top:1.5rem">Tus números</div>
+      <div class="stats-row" id="perfil-stats"></div>
+
+      <div style="display:flex;gap:0.75rem;margin-top:2rem;">
+        <button class="btn-accion full" style="background:var(--rojo);" onclick="cerrarSesion()">Cerrar sesión</button>
+        <button class="btn-accion full" style="background:transparent;border:1px solid var(--rojo);color:var(--rojo);" onclick="abrirModalEliminarCuenta()">Eliminar cuenta</button>
       </div>
     </div>
   </div>
@@ -197,7 +347,102 @@
     </div>
   </div>
 
-  <script src="datos.js"></script>
-  <script src="app.js"></script>
+  <!-- ═══════════════════════════════
+       MODAL: ELIMINAR CUENTA
+  ═══════════════════════════════ -->
+  <div id="modal-eliminar-cuenta" class="modal-overlay hidden" onclick="cerrarModal('modal-eliminar-cuenta')">
+    <div class="modal-card" onclick="event.stopPropagation()">
+      <button class="modal-cerrar" onclick="cerrarModal('modal-eliminar-cuenta')">✕</button>
+      <h3 class="modal-titulo">Eliminar cuenta</h3>
+      <p style="font-size:14px;color:var(--texto-suave);margin-bottom:1rem;">
+        Esta acción es <strong>permanente</strong>: se van a borrar tu cuenta, tus plantas guardadas, favoritos y riegos registrados. No se puede deshacer.
+      </p>
+      <label class="form-label">Confirmá tu contraseña para continuar</label>
+      <input type="password" id="input-password-eliminar" class="form-input" placeholder="Tu contraseña" />
+      <p id="error-eliminar-cuenta" style="color:var(--rojo);font-size:13px;margin-top:6px;"></p>
+      <button class="btn-accion full" style="background:var(--rojo);margin-top:0.75rem;" onclick="confirmarEliminarCuenta()">Eliminar mi cuenta definitivamente</button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════
+       MODAL: ADMIN — AGREGAR PLANTA AL CATÁLOGO
+  ═══════════════════════════════ -->
+  <div id="modal-admin-agregar" class="modal-overlay hidden" onclick="cerrarModal('modal-admin-agregar')">
+    <div class="modal-card" onclick="event.stopPropagation()">
+      <button class="modal-cerrar" onclick="cerrarModal('modal-admin-agregar')">✕</button>
+      <h3 class="modal-titulo">🌱 Agregar planta al catálogo</h3>
+
+      <label class="form-label">Nombre</label>
+      <input type="text" id="adm-nombre" class="form-input" placeholder="Ej: Potus" />
+
+      <label class="form-label">Nombre científico</label>
+      <input type="text" id="adm-cientifico" class="form-input" placeholder="Ej: Epipremnum aureum" />
+
+      <label class="form-label">Emoji</label>
+      <input type="text" id="adm-emoji" class="form-input" placeholder="🌿" value="🌱" maxlength="4" />
+
+      <label class="form-label">Categoría (elegí una o más)</label>
+      <div class="filtros-row" id="adm-categorias">
+        <label class="filtro-btn"><input type="checkbox" value="interior" style="margin-right:4px;">Interior</label>
+        <label class="filtro-btn"><input type="checkbox" value="huerta" style="margin-right:4px;">Huerta</label>
+        <label class="filtro-btn"><input type="checkbox" value="suculentas" style="margin-right:4px;">Suculentas</label>
+        <label class="filtro-btn"><input type="checkbox" value="flores" style="margin-right:4px;">Flores</label>
+        <label class="filtro-btn"><input type="checkbox" value="árboles" style="margin-right:4px;">Árboles</label>
+        <label class="filtro-btn"><input type="checkbox" value="cactus" style="margin-right:4px;">Cactus</label>
+        <label class="filtro-btn"><input type="checkbox" value="Aromáticas" style="margin-right:4px;">Aromáticas</label>
+        <label class="filtro-btn"><input type="checkbox" value="medicinal" style="margin-right:4px;">Medicinal</label>
+      </div>
+
+      <label class="form-label">Tags (separados por coma, opcional)</label>
+      <input type="text" id="adm-tags" class="form-input" placeholder="ej: purificadora, interior" />
+
+      <label class="form-label">Días entre riegos</label>
+      <input type="number" id="adm-diasriego" class="form-input" placeholder="Ej: 5" />
+
+      <label class="form-label">Luz</label>
+      <input type="text" id="adm-luz" class="form-input" placeholder="Ej: Sol indirecto" />
+
+      <label class="form-label">Meses de siembra (hemisferio sur)</label>
+      <input type="text" id="adm-mesessur" class="form-input" placeholder="Ej: Primavera" />
+
+      <label class="form-label">Meses de siembra (hemisferio norte)</label>
+      <input type="text" id="adm-mesesnorte" class="form-input" placeholder="Ej: Otoño" />
+
+      <label class="form-label">Dificultad</label>
+      <select id="adm-dificultad" class="form-select">
+        <option>Fácil</option>
+        <option>Media</option>
+        <option>Difícil</option>
+      </select>
+
+      <label class="form-label">Descripción</label>
+      <textarea id="adm-descripcion" class="form-textarea" rows="3"></textarea>
+
+      <label class="form-label">Cuidados</label>
+      <textarea id="adm-cuidados" class="form-textarea" rows="3"></textarea>
+
+      <label class="form-label">Curiosidad (opcional)</label>
+      <textarea id="adm-curiosidad" class="form-textarea" rows="2"></textarea>
+
+      <label class="form-label">Advertencia (opcional, ej: toxicidad)</label>
+      <input type="text" id="adm-advertencia" class="form-input" />
+
+      <label class="form-label">URL de imagen</label>
+      <input type="text" id="adm-imagen" class="form-input" placeholder="https://..." />
+
+      <label class="form-label" style="display:flex; align-items:center; gap:6px;">
+        <input type="checkbox" id="adm-destacada" style="width:auto;" /> Marcar como destacada
+      </label>
+
+      <div id="adm-estado" style="font-size:13px; margin:8px 0; color:var(--verde-medio);"></div>
+
+      <button class="btn-accion full" onclick="guardarPlantaAdmin()">Guardar planta</button>
+    </div>
+  </div>
+
+ <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css"/>
+ <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+ <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
+ <script src="app.js?v=2"></script>
 </body>
 </html>
